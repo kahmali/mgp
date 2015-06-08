@@ -44,73 +44,39 @@ Packages.fromFile = function (file, callback) {
   });
 };
 
-// Create a packages document per tarball url.
-// { tarUrl: { packageName: tarPath, .. }, ... }
-var getTarballDict = function (packages) {
-  var tarballs = {};
-
-  _.forOwn(packages, function (definition, packageName) {
-    if (!definition) return;
-
-    var url = definition.tarball;
-    if (!url) return;
-
-    var tarball = tarballs[url] = tarballs[url] || {};
-
-    // package name -> source path inside tarball
-    tarball[packageName] = definition.path || '';
-  });
-
-  return tarballs;
-};
-
-// Copy the packages from the tarball directory to the package path
-var copyPackages = function (packages, tarballDir, done) {
-  var packageCopied = _.after(_.keys(packages).length, done);
-
-  _.forOwn(packages, function (src, packageName) {
-    src = tarballDir + '/' + src;
-
-    // Convert colons in package names to underscores for Windows
-    packageName = packageName.replace(/:/g, '_');
-    var dest = PACKAGE_DIR + '/' + packageName;
-    fs.removeSync(dest);
-
-    fs.copy(src, dest, function (error) {
-      // Fail explicitly.
-      if (error) {
-        console.error(error);
-        throw 'Could not copy ' + src + ' to ' + dest;
-      }
-
-      packageCopied();
-    });
-  });
-};
-
 /**
  * Create a git ignore in the package directory for the packages.
- * @param packages
+ * @param definitions
  * @param {Function} callback
  */
-Packages.ensureGitIgnore = function (packages, callback) {
+Packages.ensureGitIgnore = function (definitions, callback) {
   var filePath = PACKAGE_DIR + '/.gitignore';
 
   fs.ensureFileSync(filePath);
   fs.readFile(filePath, 'utf8', function (err, gitIgnore) {
     // Append packages to the gitignore
-    _.forOwn(packages, function (def, packageName) {
+    _.forOwn(definitions, function (definition, key) {
       // Convert colons in package names to underscores for Windows
-      packageName = packageName.replace(/:/g, '_');
-
-      if (packageName === 'token' || gitIgnore.indexOf(packageName) > -1) return;
-
-      gitIgnore += packageName + '\n';
+      if (key === 'token' || gitIgnore.indexOf(key) > -1) return;
+      if (isRepoDefinition(definition)) {
+        _.forOwn(definition, function (packageDefinition) {
+          var packageName = packageDefinition.name;
+          packageName = packageName.replace(/:/g, '_');
+          gitIgnore += packageName + '\n';
+        });
+      } else {
+        key = key.replace(/:/g, '_');
+        gitIgnore += key + '\n';
+      }
     });
 
     fs.writeFile(filePath, gitIgnore, callback);
   });
 };
+
+/**
+ * Add an entry to the gitignore file
+ */
 
 /**
  * Symlink local directories to the packages directory.
@@ -184,3 +150,62 @@ Packages.load = function (packages, callback) {
         });
   });
 };
+
+// Create a packages document per tarball url.
+// { tarUrl: { packageName: tarPath, .. }, ... }
+function getTarballDict (definitions) {
+  var tarballs = {};
+  _.forOwn(definitions, function (definition, key) {
+    if (! definition) return;
+
+    // If this is a repo definition, it will contain a list of package definitions
+    var tarball;
+    if (isRepoDefinition(definition)) {
+      tarball = tarballs[key] = tarballs[key] || {};
+      _.forOwn(definition, function (packageDefinition) {
+        // package name -> source path inside tarball
+        tarball[packageDefinition.name] = packageDefinition.path || '';
+      });
+    } else {
+      // Provide backwards compatibility for all previous versions of API, where definitions were
+      // for individual packages
+      var url = definition.tarball;
+      if (!url) return;
+
+      tarball = tarballs[url] = tarballs[url] || {};
+      // package name -> source path inside tarball
+      tarball[key] = definition.path || '';
+    }
+  });
+
+  console.log(tarballs);
+  return tarballs;
+}
+
+// Copy the packages from the tarball directory to the package path
+function copyPackages (packages, tarballDir, done) {
+  var packageCopied = _.after(_.keys(packages).length, done);
+
+  _.forOwn(packages, function (src, packageName) {
+    src = tarballDir + '/' + src;
+
+    // Convert colons in package names to underscores for Windows
+    packageName = packageName.replace(/:/g, '_');
+    var dest = PACKAGE_DIR + '/' + packageName;
+    fs.removeSync(dest);
+
+    fs.copy(src, dest, function (error) {
+      // Fail explicitly.
+      if (error) {
+        console.error(error);
+        throw 'Could not copy ' + src + ' to ' + dest;
+      }
+
+      packageCopied();
+    });
+  });
+}
+
+function isRepoDefinition (definition) {
+  return _.isArray(definition)
+}

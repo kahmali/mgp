@@ -4,18 +4,26 @@ var _ = require('lodash'),
   fs = require('fs-extra');
 
 var PACKAGES_TO_LOAD = {
-  "jon:bank-account": {
-    "tarball": "https://api.github.com/repos/jperl/mgp-private-package-test/tarball/327746c6eb3aface483c9879472cb43c27808185",
+  // Test a repository definition with multiple packages included
+  "https://api.github.com/repos/jperl/mgp-private-package-test/tarball/c2792ca2970c6d88e5e2fb6b8a26e26b81d220f9": [
+    {
+    "name": "jon:bank-account",
     "path": "bank-account"
-  },
-  "jon:secrets": {
-    "tarball": "https://api.github.com/repos/jperl/mgp-private-package-test/tarball/c2792ca2970c6d88e5e2fb6b8a26e26b81d220f9",
+    },
+    {
+    "name": "jon:secrets",
     "path": "secrets"
+    }
+  ],
+  // Test the legacy API, where only single packages could be defined at a time
+  "jon:legacy": {
+    "tarball": "https://api.github.com/repos/jperl/mgp-private-package-test/tarball/c2792ca2970c6d88e5e2fb6b8a26e26b81d220f9",
+    "path": "legacy"
   },
-  // Test multiple packages per tarball we ran into
+  // Test multiple packages per individual tarball. We ran into
   // an issue before where that did not work.
   "jon:bank-account2": {
-    "tarball": "https://api.github.com/repos/jperl/mgp-private-package-test/tarball/c2792ca2970c6d88e5e2fb6b8a26e26b81d220f9",
+    "tarball": "https://api.github.com/repos/jperl/mgp-private-package-test/tarball/327746c6eb3aface483c9879472cb43c27808185",
     "path": "bank-account"
   },
   // From an encrypted variable. We had remove the
@@ -35,7 +43,8 @@ var checkFiles = function (done) {
     expectFiles('test/packages', [
       'jon_bank-account/README.md',
       'jon_bank-account/folder/INSIDE.md',
-      'jon_secrets/README.md'
+      'jon_secrets/README.md',
+      'jon_legacy/README.md'
     ]);
 
     done();
@@ -76,6 +85,9 @@ var PACKAGES_TO_LINK = {
   },
   "jon:secrets": {
     "path": "test/source-for-link/mgp-private-package-test/secrets"
+  },
+  "jon:legacy": {
+    "path": "test/source-for-link/mgp-private-package-test/legacy"
   },
   "jon:bank-account2": {
     "path": "test/source-for-link/mgp-private-package-test/bank-account"
